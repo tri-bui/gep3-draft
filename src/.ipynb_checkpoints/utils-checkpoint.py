@@ -5,6 +5,11 @@ import matplotlib.pyplot as plt
 
 
 
+####################      GENERAL      ####################
+
+
+
+
 def reduce_mem(df):
     
     '''
@@ -61,6 +66,11 @@ def get_stats(df):
     stats['max_'] = df.max().map(lambda n: np.NaN if type(n) not in [int, float] else n)
     stats['dtype_'] = df.dtypes
     return stats.T.fillna('-')
+
+
+
+
+####################      DATAFRAME TRANSFORMATION      ####################
 
 
 
@@ -123,6 +133,68 @@ def get_site(df, site_num, time_idx=False, site_col='site_id', time_col='timesta
     if time_idx:
         df.set_index(time_col, inplace=True)
     return df
+
+
+
+
+def extract_from_dt(df, dt_components, time_col='timestamp'):
+    
+    '''
+    Function:
+        Extract datetime components from a datetime column of a dataframe and add them as new columns
+        
+    Input:
+        df - Pandas dataframe with a time column
+        dt_components - a list of Pandas datetime components to extract
+        time_col (optional) - name of column containing meter readings timestamps
+        
+        Note: pass in time_col if different from default
+        
+    Output:
+        Pandas dataframe with added columns
+    '''
+    
+    for comp in dt_components:
+        if comp == 'dayofyear':
+            df[comp] = df[time_col].dt.dayofyear
+        if comp == 'month':
+            df[comp] = df[time_col].dt.month
+        if comp == 'day':
+            df[comp] = df[time_col].dt.day
+        if comp == 'dayofweek':
+            df[comp] = df[time_col].dt.dayofweek
+        if comp == 'hour':
+            df[comp] = df[time_col].dt.hour
+    return df
+
+
+
+
+def deg_to_components(df, deg_col):
+    
+    '''
+    Function:
+        Break the polar degree values of a column into x and y components
+        
+        Note: 0 degrees will be 0 for both components
+        
+    Input:
+        df - Pandas dataframe with a column in polar degrees
+        deg_col - name of column with values in polar degrees
+        
+    Output:
+        Pandas dataframe with added columns
+    '''
+    
+    df[f'{deg_col}_x'] = np.cos(df[deg_col] * np.pi / 180)
+    df[f'{deg_col}_y'] = np.sin(df[deg_col] * np.pi / 180)
+    df.loc[df[deg_col] == 0, f'{deg_col}_x'] = 0
+    return df
+
+
+
+
+####################      MISSING VALUES      ####################
 
 
 
@@ -215,6 +287,142 @@ def fill_missing(df, cols_to_ffill, cols_to_interp_lin, cols_to_interp_cubic, si
 
 
 
+def print_missing_readings(df, building_col='building_id', meter_col='meter', time_col='timestamp'):
+    
+    '''
+    Function:
+        Print the details of missing meter readings
+        
+    Input:
+        df - Pandas dataframe with a building column, meter type column, and time column
+        building_col (optional) - name of column containing buildings
+        meter_col (optional) - name of column containing meter types
+        time_col (optional) - name of column containing timestamps
+        
+        Note: pass in building_col, meter_col, and time_col if different from defaults
+        
+    Output:
+        None
+    '''
+    
+    types = ['electricity', 'chilledwater', 'steam', 'hotwater']
+    
+    by_bm = df.groupby([building_col, meter_col]).count().reset_index()
+    m_count = by_bm[meter_col].value_counts()
+    
+    metr_m = by_bm[by_bm[time_col] != 8784]
+    bldg_m = metr_m[building_col].nunique()
+    type_m = metr_m[meter_col].value_counts()
+    
+    print(f'{bldg_m} different buildings ({bldg_m * 100 // by_bm[building_col].nunique()}%) have meters that are missing readings')
+    print(f'A total of {metr_m.shape[0]} meters ({metr_m.shape[0] * 100 // by_bm.shape[0]}%) are missing readings\n')
+
+    for i in range(type_m.shape[0]):
+        print(f'{type_m[i]} {types[i]} meters ({type_m[i] * 100 // m_count[i]}%) are missing readings')
+        
+        
+        
+        
+####################      FEATURES      ####################
+
+
+
+
+def encode_cat(encoder, df, col_to_encode):
+    
+    '''
+    Function:
+        Numerically encoded a categorical column of a Pandas dataframe
+        
+    Input:
+        encoder - an encoder class from Sklearn with dense output
+        df - Pandas dataframe with a categorical column
+        col_to_encode - name of categorical column
+        
+    Output:
+        Pandas dataframe of encoded categories
+    '''
+    
+    encoded = encoder.fit_transform(df[[col_to_encode]])
+    encoded = pd.DataFrame(encoded, columns=encoder.categories_)
+    return encoded.astype('uint8')
+    
+
+
+
+def constant_feats(df):
+    
+    '''
+    Function:
+        Check a Pandas dataframe for constant and quasi-constant features
+        
+    Input:
+        df - Pandas dataframe
+        
+    Output:
+        Pandas dataframe showing the variance of each variable and wether or not they're a constant/quasi-constant feature
+    '''
+    
+    const = pd.DataFrame(df.var(), columns=['variance'])
+    const['constant'] = const.variance == 0
+    const['quasiconstant'] = const.variance < 0.01
+    return const
+    
+    
+    
+    
+def duplicated_feats(df):
+    
+    '''
+    Function:
+        Check a Pandas dataframe for duplicated features
+        
+    Input:
+        df - Pandas dataframe
+        
+    Output:
+        A list of pairs of duplicated features (in tuples)
+    '''
+    
+    dup = []
+    for i, col1 in enumerate(df.columns[:-1]):
+        for col2 in df.columns[i+1:]:
+            if df[col1].equals(df[col2]):
+                dup.append((col1, col2))
+    return dup
+
+
+
+
+def correlated_feats(df, threshold):
+    
+    '''
+    Function:
+        Check a Pandas dataframe for correlated features
+        
+    Input:
+        df - Pandas dataframe with correlation coefficients
+        
+    Output:
+        A list of pairs of correlated features and their correlation coefficient (in tuples)
+    '''
+
+    pairs = []
+    for i, feat1 in enumerate(df.columns[:-1]):
+        for feat2 in df.columns[i+1:]:
+            coef = df.loc[feat1, feat2]
+            if coef >= threshold:
+                pairs.append((feat1, feat2, coef))
+    return pairs
+
+
+
+
+####################      CONVERSION      ####################
+
+
+
+
 def to_local_time(df, timezones, site_col='site_id', time_col='timestamp'):
     
     '''
@@ -274,42 +482,11 @@ def convert_readings(df, site_num, meter_type, conversion, site_col='site_id', m
 
 
 
-def print_missing_readings(df, building_col='building_id', meter_col='meter', time_col='timestamp'):
-    
-    '''
-    Function:
-        Print the details of missing meter readings
-        
-    Input:
-        df - Pandas dataframe with a building column, meter type column, and time column
-        building_col (optional) - name of column containing buildings
-        meter_col (optional) - name of column containing meter types
-        time_col (optional) - name of column containing timestamps
-        
-        Note: pass in building_col, meter_col, and time_col if different from defaults
-        
-    Output:
-        None
-    '''
-    
-    types = ['electricity', 'chilledwater', 'steam', 'hotwater']
-    
-    by_bm = df.groupby([building_col, meter_col]).count().reset_index()
-    m_count = by_bm[meter_col].value_counts()
-    
-    metr_m = by_bm[by_bm[time_col] != 8784]
-    bldg_m = metr_m[building_col].nunique()
-    type_m = metr_m[meter_col].value_counts()
-    
-    print(f'{bldg_m} different buildings ({bldg_m * 100 // by_bm[building_col].nunique()}%) have meters that are missing readings')
-    print(f'A total of {metr_m.shape[0]} meters ({metr_m.shape[0] * 100 // by_bm.shape[0]}%) are missing readings\n')
+####################      PLOTTING      ####################
 
-    for i in range(type_m.shape[0]):
-        print(f'{type_m[i]} {types[i]} meters ({type_m[i] * 100 // m_count[i]}%) are missing readings')
-        
-        
-        
-        
+
+
+
 def plot_readings(df, buildings, freq=None, group=None, start=None, end=None, ticks=None, reverse=False, time_col='timestamp', building_col='building_id', meter_col='meter', reading_col='meter_reading'):
     
     '''
@@ -375,6 +552,7 @@ def show_elec_readings(df, by, idx='timestamp', vals='meter_reading', freq=None,
         by - name of column to pivot to columns
         idx (optional) - name of column to set as index in pivot table
         vals (optional) - name of column to aggregate from for pivot table
+        freq (optional) - resampling frequency
         legend_pos (optional) - a tuple to indicate the legend's anchor position
         legend_col (optional) - number of columns in legend
         cols_to_sep (optional) - list of columns to plot separately
