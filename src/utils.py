@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 
 
-def reduce_mem(df):
+def reduce_mem_usage(df):
     
     '''
     Function:
@@ -32,7 +32,7 @@ def reduce_mem(df):
             df[col] = df[col].astype('category')
         elif df[col].dtype == 'float64':
             df[col] = df[col].astype('float32')
-        elif df[col].dtype == 'int64':
+        elif str(df[col].dtype) in 'uint64':
             if df[col].max() < uint8_lim and df[col].min() >= 0:
                 df[col] = df[col].astype('uint8')
             elif df[col].max() < uint16_lim and df[col].min() >= 0:
@@ -66,6 +66,40 @@ def get_stats(df):
     stats['max_'] = df.max().map(lambda n: np.NaN if type(n) not in [int, float] else n)
     stats['dtype_'] = df.dtypes
     return stats.T.fillna('-')
+
+
+
+
+def calc_outlier_threshold(df, col_name, stat='std', mult=3):
+    
+    '''
+    Function:
+        Calculate the thresholds at which to consider observations an outlier
+    
+    Input:
+        df - Pandas dataframe
+        col_name - name of column to calculate threshold for
+        stat (optional) - either standard deviation (std) or interquantile range (iqr)
+        mult (optional) - multiplier for the stat
+    
+    Output:
+        A list of the lower and upper outlier thresholds
+    '''
+    
+    if stat == 'std':
+        avg = df[col_name].mean()
+        stdev = df[col_name].std()
+        lower = avg - stdev * mult
+        upper = avg + stdev * mult
+    
+    if stat == 'iqr':
+        q25 = df[col_name].quantile(0.25)
+        q75 = df[col_name].quantile(0.75)
+        iqr = q75 - q25
+        lower = q25 - iqr * mult
+        upper = q75 + iqr * mult
+
+    return [lower, upper]
 
 
 
@@ -487,7 +521,30 @@ def convert_readings(df, site_num, meter_type, conversion, site_col='site_id', m
 
 
 
-def plot_readings(df, buildings, freq=None, group=None, start=None, end=None, ticks=None, reverse=False, time_col='timestamp', building_col='building_id', meter_col='meter', reading_col='meter_reading'):
+def plot_dist(df, cols):
+    
+    '''
+    Function:
+        Plot the value distribution of certain columns of a dataframe
+        
+    Input:
+        df - Pandas dataframe with numeric columns
+        cols - an iterable or columns to plot
+        
+    Output:
+        None
+    '''
+    
+    colors = 'bgrcmykw'
+    for col in cols:
+        fig = plt.figure(figsize=(16, 4))
+        df.iloc[:, col].plot.hist(bins=16, color=colors[cols.index(col)])
+        plt.xlabel(df.columns[col].replace('_', ' ').capitalize())
+
+
+
+
+def plot_readings(df, buildings, freq=None, group=None, start=None, end=None, ticks=None, buildings_first=False, time_col='timestamp', building_col='building_id', meter_col='meter', reading_col='meter_reading'):
     
     '''
     Function:
@@ -501,7 +558,7 @@ def plot_readings(df, buildings, freq=None, group=None, start=None, end=None, ti
         start (optional) - the start index to slice buildings on
         end (optional) - the end index to slice buildings on
         ticks (optional) - a range of xtick locations
-        reverse (optional) - a boolean to indicate whether or not to iterate through buildings first then meters
+        buildings_first (optional) - a boolean to indicate whether or not to iterate through buildings first then meters
         time_col (optional) - name of column containing timestamps
         building_col (optional) - name of column containing buildings
         meter_col (optional) - name of column containing meter types
@@ -517,7 +574,7 @@ def plot_readings(df, buildings, freq=None, group=None, start=None, end=None, ti
     df = df.set_index(time_col)
     types = ['electricity', 'chilledwater', 'steam', 'hotwater']
     
-    if reverse:
+    if buildings_first:
         for b in buildings:
             for m in df[df[building_col] == b][meter_col].unique():
                 fig = plt.figure(figsize=(16, 4))
