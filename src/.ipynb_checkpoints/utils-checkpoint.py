@@ -1,6 +1,13 @@
+import holidays
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from feature_engine.categorical_encoders import RareLabelCategoricalEncoder, MeanCategoricalEncoder
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_squared_error, mean_squared_log_error
+import lightgbm as lgb
+import xgboost as xgb
+import optuna
 
 
 
@@ -28,9 +35,7 @@ def reduce_mem_usage(df):
     uint32_lim = 2 ** 32
 
     for col in df.columns:
-        if df[col].dtype == 'O':
-            df[col] = df[col].astype('category')
-        elif df[col].dtype == 'float64':
+        if df[col].dtype == 'float64':
             df[col] = df[col].astype('float32')
         elif str(df[col].dtype) in 'uint64':
             if df[col].max() < uint8_lim and df[col].min() >= 0:
@@ -39,6 +44,8 @@ def reduce_mem_usage(df):
                 df[col] = df[col].astype('uint16')
             elif df[col].max() < uint32_lim and df[col].min() >= 0:
                 df[col] = df[col].astype('uint32')
+#         elif df[col].dtype == 'O':
+#             df[col] = df[col].astype('category')
                 
     return df
 
@@ -362,6 +369,118 @@ def print_missing_readings(df, building_col='building_id', meter_col='meter', ti
 
 
 
+def rare_encoder(train, test, var, val=0, tol=0.05):
+    
+    '''
+    Function:
+        Apply feature_engine's RareLabelCategoricalEncoder to both a train and test set
+    
+    Input:
+        train - train data
+        test - test data
+        var - list of features to encode (must be object type)
+        tol (optional) - frequency threshold to categorize as a rare label
+        val (optional) - validation data
+    
+    Output:
+        Transformed train set, transformed test set, dictionary of encoded values
+    '''
+    
+    enc = RareLabelCategoricalEncoder(tol=tol, variables=var)
+    enc.fit(train)
+    train = enc.transform(train)
+    test = enc.transform(test)
+    if type(val) != int:
+        val = enc.transform(val)
+    return train, val, test, enc.encoder_dict_
+
+
+
+
+
+def mean_encoder(X_train, y_train, X_test, var, X_val=0):
+    
+    '''
+    Function:
+        Apply feature_engine's MeanCategoricalEncoder to both a train and test set
+    
+    Input:
+        X_train - train data
+        y_train - train label
+        X_test - test data
+        var - list of features to encode (must be object type)
+        X_val (optional) - validation data
+    
+    Output:
+        Transformed train set, transformed test set, dictionary of encoded values
+    '''
+    
+    enc = MeanCategoricalEncoder(variables=var)
+    enc.fit(X_train, y_train)
+    X_train = enc.transform(X_train)
+    X_test = enc.transform(X_test)
+    if type(X_val) != int:
+        X_val = enc.transform(X_val)
+    return X_train, X_val, X_test, enc.encoder_dict_
+
+    
+    
+    
+def scale_feats(train, test, val=0):
+
+    '''
+    Function:
+        Apply scikit-learn's StandardScaler to both a train and test set
+    
+    Input:
+        train - train data
+        test - test data
+        val (optional) - validation data
+    
+    Output:
+        Transformed train set, transformed test set
+    '''
+    
+    scaler = StandardScaler()
+    scaler.fit(train)
+    train_scaled = scaler.transform(train)
+    train_df = pd.DataFrame(train_scaled, columns=train.columns)
+    test_scaled = scaler.transform(test)
+    test_df = pd.DataFrame(test_scaled, columns=test.columns)
+    val_df = 0
+    if type(val) != int:
+        val_scaled = scaler.transform(val)
+        val_df = pd.DataFrame(val_scaled, columns=val.columns)
+    return train_df, val_df, test_df
+    
+    
+    
+    
+def find_rare_cats(df, col):
+    
+    '''
+    Function:
+        Plot the value counts of each category of a feature
+        
+    Input:
+        df - Pandas dataframe with a categorical column
+        col - name of categorical column
+        
+    Output:
+        Pandas series of value counts
+    '''
+
+    counts = df[col].value_counts()
+    
+    counts.plot.bar()
+    plt.axhline(y=df.shape[0] * 0.05, color='red')
+    plt.xticks(rotation=45, ha='right')
+    
+    return counts
+
+
+
+
 def encode_cat(encoder, df, col_to_encode):
     
     '''
@@ -452,7 +571,99 @@ def correlated_feats(df, threshold):
 
 
 
+def feats_from_model(X, y, seln_model, ml_model):
+    
+    '''
+    Function:
+        Select features using a machine learning model
+        
+    Input:
+        X - data
+        y - target
+        seln_model - name of scikit-learn model class
+        ml_model - scikit-learn model class
+        
+    Output:
+        List of selected features
+    '''
+    
+    sel = seln_model(ml_model)
+    sel.fit(X, y)
+    return X.columns[sel.get_support()].tolist()
+
+
+
+
+def inc_feat_count(count_df, feats, count_col='count'):
+    
+    '''
+    Function:
+        Increment the count for selected features
+        
+    Input:
+        count_df - pandas dataframe keeping count for selected features
+        feats - list of selected features
+        count_col (optional) - name of count column
+        
+    Output:
+        Pandas dataframe with updated counts
+    '''
+    
+    for feat in feats:
+        count_df.loc[feat, count_col] += 1
+    return count_df
+
+
+
+
+####################      MODELING      ####################
+
+
+
+
+def objective(trial):
+    
+    '''
+    Function:
+        Objective function for LightGBM parameter tuning using Optuna
+        
+    Input:
+        Optuna's trial object
+        
+    Output:
+        Root mean squared log error of the trial
+    '''
+
+    
+    
+
+
+
 ####################      CONVERSION      ####################
+
+
+
+
+def calc_rel_humidity(T, Td):
+    
+    '''
+    Function:
+        Calculate the relative humidity using air temperature and dew temperature
+        
+    Input:
+        T - air temperature in degrees Celsius
+        Td - dew temperature in degrees Celsius
+        
+    Output:
+        Relative humidity
+        
+    Source:
+        https://www.weather.gov/media/epz/wxcalc/vaporPressure.pdf
+    '''
+    
+    e = 6.11 * 10.0 ** (7.5 * Td / (237.3 + Td))
+    es = 6.11 * 10.0 ** (7.5 * T / (237.3 + T))
+    return e * 100 / es
 
 
 
