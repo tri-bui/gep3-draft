@@ -1,3 +1,4 @@
+import joblib
 import holidays
 import numpy as np
 import pandas as pd
@@ -369,7 +370,7 @@ def print_missing_readings(df, building_col='building_id', meter_col='meter', ti
 
 
 
-def rare_encoder(train, test, var, val=0, tol=0.05):
+def rare_encoder(train, test, var, val=0, tol=0.05, path='../objects/transformers/rare_enc/', name='rare_enc.pkl'):
     
     '''
     Function:
@@ -381,6 +382,8 @@ def rare_encoder(train, test, var, val=0, tol=0.05):
         var - list of features to encode (must be object type)
         tol (optional) - frequency threshold to categorize as a rare label
         val (optional) - validation data
+        path (optional) - output directory path
+        name (optional) - output file name
     
     Output:
         Transformed train set, transformed test set, dictionary of encoded values
@@ -388,6 +391,7 @@ def rare_encoder(train, test, var, val=0, tol=0.05):
     
     enc = RareLabelCategoricalEncoder(tol=tol, variables=var)
     enc.fit(train)
+    joblib.dump(enc, path + name)
     train = enc.transform(train)
     test = enc.transform(test)
     if type(val) != int:
@@ -398,7 +402,7 @@ def rare_encoder(train, test, var, val=0, tol=0.05):
 
 
 
-def mean_encoder(X_train, y_train, X_test, var, X_val=0):
+def mean_encoder(X_train, y_train, X_test, var, X_val=0, path='../objects/transformers/mean_enc/', name='mean_enc.pkl'):
     
     '''
     Function:
@@ -410,6 +414,8 @@ def mean_encoder(X_train, y_train, X_test, var, X_val=0):
         X_test - test data
         var - list of features to encode (must be object type)
         X_val (optional) - validation data
+        path (optional) - output directory path
+        name (optional) - output file name
     
     Output:
         Transformed train set, transformed test set, dictionary of encoded values
@@ -417,6 +423,7 @@ def mean_encoder(X_train, y_train, X_test, var, X_val=0):
     
     enc = MeanCategoricalEncoder(variables=var)
     enc.fit(X_train, y_train)
+    joblib.dump(enc, path + name)
     X_train = enc.transform(X_train)
     X_test = enc.transform(X_test)
     if type(X_val) != int:
@@ -426,7 +433,7 @@ def mean_encoder(X_train, y_train, X_test, var, X_val=0):
     
     
     
-def scale_feats(train, test, val=0):
+def scale_feats(train, test, val=0, path='../objects/transformers/scaler/', name='scaler.pkl'):
 
     '''
     Function:
@@ -436,6 +443,8 @@ def scale_feats(train, test, val=0):
         train - train data
         test - test data
         val (optional) - validation data
+        path (optional) - output directory path
+        name (optional) - output file name
     
     Output:
         Transformed train set, transformed test set
@@ -443,6 +452,7 @@ def scale_feats(train, test, val=0):
     
     scaler = StandardScaler()
     scaler.fit(train)
+    joblib.dump(scaler, path + name)
     train_scaled = scaler.transform(train)
     train_df = pd.DataFrame(train_scaled, columns=train.columns)
     test_scaled = scaler.transform(test)
