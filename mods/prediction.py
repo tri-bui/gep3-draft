@@ -1,9 +1,8 @@
-import config
 import features
 import joblib
 import numpy as np
 import pandas as pd
-from sklearn.base import BaseEstimator, TransformerMixin
+import xgboost as xgb
 
 
 # # Rare label categorical encoders
@@ -79,15 +78,15 @@ def transform(df, rare_enc, mean_enc, scaler):
 	:return: transformed dataframe with selected features
 	'''
 
-	encoded = rare_enc.transform(df)
-	encoded = mean_enc.transform(encoded)
-	scaled = scaler.transform(encoded)
-	scaled = pd.DataFrame(scaled, columns=df.columns)
-	df = features.select_feats(scaled)
-	return df
+	df = features.select_feats(df)
+	transformed = rare_enc.transform(df)
+	transformed = mean_enc.transform(transformed)
+	transformed = scaler.transform(transformed)
+	transformed = pd.DataFrame(transformed, columns=df.columns)
+	return transformed
 
 
-def predict(df, model_path, xgb=True):
+def predict(df, model_path, use_xgb=True):
 
 	'''
 	Make predictions using a trained model.
@@ -95,12 +94,12 @@ def predict(df, model_path, xgb=True):
 	:param df: (Pandas dataframe) data with features matching
 			   training data
 	:param model_path: (string) path to trained model
-	:param xgb: (boolean) whether or not to predict using a XGBoost model
+	:param use_xgb: (boolean) whether or not to predict using a XGBoost model
 
 	:return: non-negative predictions
 	'''
 
-	if xgb:
+	if use_xgb:
 		df = xgb.DMatrix(df)
 
 	model = joblib.load(model_path)
@@ -151,13 +150,14 @@ def convert_site0_units(df,
 	return df
 
 
-def pred_lgb(df, rare_enc_list, mean_enc_list, sclr_list, model_path,
-             output_path='predictions/pred.csv',
-             sqft_var='square_feet',
-             target_var='meter_reading'):
+def make_preds(df, rare_enc_list, mean_enc_list, sclr_list, model_path,
+               output_path='predictions/pred.csv',
+               use_xgb=True,
+               sqft_var='square_feet',
+               target_var='meter_reading'):
 
 	'''
-	Make predictions using LightGBM.
+	Make predictions using LightGBM or XGBoost.
 
 	:param df: (Pandas dataframe) preprocessed data with listed variables
 	:param rare_enc_list: (List of Feature-engine categorical encoder objects)
@@ -168,6 +168,7 @@ def pred_lgb(df, rare_enc_list, mean_enc_list, sclr_list, model_path,
 					  trained standard scalers
 	:param model_path: (String) path to trained LightGBM model
 	:param output_path: (String) path to save predictions
+	:param use_xgb: (boolean) whether or not to predict using a XGBoost model
 	:param sqft_var: (String) name of square footage variable
 	:param target_var: (String) name of target variable
 
@@ -180,51 +181,7 @@ def pred_lgb(df, rare_enc_list, mean_enc_list, sclr_list, model_path,
 
 	for i in range(4):
 		X = transform(df_list[i], rare_enc_list[i], mean_enc_list[i], sclr_list[i])
-		y_pred = predict(X, model_path + str(i) + '.pkl', xgb=False)
-		y = df_list[i][[sqft_var]].copy()
-		y[target_var] = y_pred
-		y = inverse_transform(y)
-		preds.append(y)
-
-	pred = pd.concat(preds).sort_index().reset_index()
-	pred = pd.merge(df[['index', 'site_id', 'meter']], pred, on='index', how='left')
-	pred = convert_site0_units(pred)
-	pred = pred[['index', 'meter_reading']]
-	pred.columns = ['row_id', 'meter_reading']
-	pred.to_csv(output_path)
-	return pred
-
-
-def pred_xgb(df, rare_enc_list, mean_enc_list, sclr_list, model_path,
-             output_path='predictions/pred.csv',
-             sqft_var='square_feet',
-             target_var='meter_reading'):
-
-	'''
-	Make predictions using XGBoost.
-
-	:param df: (Pandas dataframe) preprocessed data with listed variables
-	:param rare_enc_list: (List of Feature-engine categorical encoder objects)
-						  trained rare label categorical encoders
-	:param mean_enc_list: (List of Feature-engine categorical encoder objects)
-						  trained mean categorical encoders
-	:param sclr_list: (List of Scikit-learn preprocessing objects)
-					  trained standard scalers
-	:param model_path: (String) path to trained XGBoost model
-	:param output_path: (String) path to save predictions
-	:param sqft_var: (String) name of square footage variable
-	:param target_var: (String) name of target variable
-
-	:return: predictions in a dataframe (Kaggle submission format)
-	'''
-
-	df.reset_index(inplace=True)
-	df_list = split(df)
-	preds = []
-
-	for i in range(4):
-		X = transform(df_list[i], rare_enc_list[i], mean_enc_list[i], sclr_list[i])
-		y_pred = predict(X, model_path + str(i) + '.pkl')
+		y_pred = predict(X, model_path + str(i) + '.pkl', use_xgb=use_xgb)
 		y = df_list[i][[sqft_var]].copy()
 		y[target_var] = y_pred
 		y = inverse_transform(y)
