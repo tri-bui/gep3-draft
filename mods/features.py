@@ -99,15 +99,14 @@ class HolidayExtractor(BaseEstimator, TransformerMixin):
 		return self
 
 	def transform(self, X):
-		X = X.copy()
 		X['country'] = X[self.site_var].map(self.countries)
-		US = X[X.country == 'US']
+		US = X[X.country == 'US'].copy()
 		US['is_holiday'] = US[self.time_var].map(lambda d: int(d in self.USh))
-		CA = X[X.country == 'CA']
+		CA = X[X.country == 'CA'].copy()
 		CA['is_holiday'] = CA[self.time_var].map(lambda d: int(d in self.CAh))
-		UK = X[X.country == 'UK']
+		UK = X[X.country == 'UK'].copy()
 		UK['is_holiday'] = UK[self.time_var].map(lambda d: int(d in self.UKh))
-		IE = X[X.country == 'IE']
+		IE = X[X.country == 'IE'].copy()
 		IE['is_holiday'] = IE[self.time_var].map(lambda d: int(d in self.IEh))
 		X = pd.concat([US, CA, UK, IE]).sort_index()
 		return X

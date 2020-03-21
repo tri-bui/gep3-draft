@@ -6,40 +6,40 @@ import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 
 
-# Rare label categorical encoders
-rare_enc0 = joblib.load('transformers/rare_enc/rare_enc0.pkl')
-rare_enc1 = joblib.load('transformers/rare_enc/rare_enc1.pkl')
-rare_enc2 = joblib.load('transformers/rare_enc/rare_enc2.pkl')
-rare_enc3 = joblib.load('transformers/rare_enc/rare_enc3.pkl')
-rare_enc = [rare_enc0, rare_enc1, rare_enc2, rare_enc3]
-
-# Mean categorical encoders
-mean_enc0 = joblib.load('transformers/mean_enc/mean_enc0.pkl')
-mean_enc1 = joblib.load('transformers/mean_enc/mean_enc1.pkl')
-mean_enc2 = joblib.load('transformers/mean_enc/mean_enc2.pkl')
-mean_enc3 = joblib.load('transformers/mean_enc/mean_enc3.pkl')
-mean_enc = [mean_enc0, mean_enc1, mean_enc2, mean_enc3]
-
-# Standard scalers
-scaler0 = joblib.load('transformers/scaler/scaler0.pkl')
-scaler1 = joblib.load('transformers/scaler/scaler1.pkl')
-scaler2 = joblib.load('transformers/scaler/scaler2.pkl')
-scaler3 = joblib.load('transformers/scaler/scaler3.pkl')
-scaler = [scaler0, scaler1, scaler2, scaler3]
-
-# LightGBM models
-lgb0 = joblib.load('models/lgb/lgb0.pkl')
-lgb1 = joblib.load('models/lgb/lgb1.pkl')
-lgb2 = joblib.load('models/lgb/lgb2.pkl')
-lgb3 = joblib.load('models/lgb/lgb3.pkl')
-lgb = [lgb0, lgb1, lgb2, lgb3]
-
-# XGBoost Models
-xgb0 = joblib.load('models/xgb/xgb0.pkl')
-xgb1 = joblib.load('models/xgb/xgb1.pkl')
-xgb2 = joblib.load('models/xgb/xgb2.pkl')
-xgb3 = joblib.load('models/xgb/xgb3.pkl')
-xgb = [xgb0, xgb1, xgb2, xgb3]
+# # Rare label categorical encoders
+# rare_enc0 = joblib.load('transformers/rare_enc/rare_enc0.pkl')
+# rare_enc1 = joblib.load('transformers/rare_enc/rare_enc1.pkl')
+# rare_enc2 = joblib.load('transformers/rare_enc/rare_enc2.pkl')
+# rare_enc3 = joblib.load('transformers/rare_enc/rare_enc3.pkl')
+# rare_enc = [rare_enc0, rare_enc1, rare_enc2, rare_enc3]
+#
+# # Mean categorical encoders
+# mean_enc0 = joblib.load('transformers/mean_enc/mean_enc0.pkl')
+# mean_enc1 = joblib.load('transformers/mean_enc/mean_enc1.pkl')
+# mean_enc2 = joblib.load('transformers/mean_enc/mean_enc2.pkl')
+# mean_enc3 = joblib.load('transformers/mean_enc/mean_enc3.pkl')
+# mean_enc = [mean_enc0, mean_enc1, mean_enc2, mean_enc3]
+#
+# # Standard scalers
+# scaler0 = joblib.load('transformers/scaler/scaler0.pkl')
+# scaler1 = joblib.load('transformers/scaler/scaler1.pkl')
+# scaler2 = joblib.load('transformers/scaler/scaler2.pkl')
+# scaler3 = joblib.load('transformers/scaler/scaler3.pkl')
+# scaler = [scaler0, scaler1, scaler2, scaler3]
+#
+# # LightGBM models
+# lgb0 = joblib.load('models/lgb/lgb0.pkl')
+# lgb1 = joblib.load('models/lgb/lgb1.pkl')
+# lgb2 = joblib.load('models/lgb/lgb2.pkl')
+# lgb3 = joblib.load('models/lgb/lgb3.pkl')
+# lgb = [lgb0, lgb1, lgb2, lgb3]
+#
+# # XGBoost Models
+# xgb0 = joblib.load('models/xgb/xgb0.pkl')
+# xgb1 = joblib.load('models/xgb/xgb1.pkl')
+# xgb2 = joblib.load('models/xgb/xgb2.pkl')
+# xgb3 = joblib.load('models/xgb/xgb3.pkl')
+# xgb = [xgb0, xgb1, xgb2, xgb3]
 
 
 def split(df,
@@ -87,19 +87,23 @@ def transform(df, rare_enc, mean_enc, scaler):
 	return df
 
 
-def predict(df, model):
+def predict(df, model_path, xgb=True):
 
 	'''
 	Make predictions using a trained model.
 
 	:param df: (Pandas dataframe) data with features matching
 			   training data
-	:param model: (model object) trained machine learning model with
-				  .predict method
+	:param model_path: (string) path to trained model
+	:param xgb: (boolean) whether or not to predict using a XGBoost model
 
 	:return: non-negative predictions
 	'''
 
+	if xgb:
+		df = xgb.DMatrix(df)
+
+	model = joblib.load(model_path)
 	pred = model.predict(df)
 	pred[pred < 0] = 0
 	return pred
@@ -147,30 +151,37 @@ def convert_site0_units(df,
 	return df
 
 
-def pred_lgb(df,
+def pred_lgb(df, rare_enc_list, mean_enc_list, sclr_list, model_path,
+             output_path='predictions/pred.csv',
              sqft_var='square_feet',
-             target_var='meter_reading',
-             output_path='predictions/pred.csv'):
+             target_var='meter_reading'):
 
 	'''
 	Make predictions using LightGBM.
 
 	:param df: (Pandas dataframe) preprocessed data with listed variables
+	:param rare_enc_list: (List of Feature-engine categorical encoder objects)
+						  trained rare label categorical encoders
+	:param mean_enc_list: (List of Feature-engine categorical encoder objects)
+						  trained mean categorical encoders
+	:param sclr_list: (List of Scikit-learn preprocessing objects)
+					  trained standard scalers
+	:param model_path: (String) path to trained LightGBM model
+	:param output_path: (String) path to save predictions
 	:param sqft_var: (String) name of square footage variable
 	:param target_var: (String) name of target variable
-	:param output_path: (String) path to save predictions
 
 	:return: predictions in a dataframe (Kaggle submission format)
 	'''
 
 	df.reset_index(inplace=True)
-	dfs = split(df)
+	df_list = split(df)
 	preds = []
 
 	for i in range(4):
-		X = transform(dfs[i], rare_enc[i], mean_enc[i], scaler[i])
-		y_pred = predict(X, lgb[i])
-		y = dfs[i][[sqft_var]].copy()
+		X = transform(df_list[i], rare_enc_list[i], mean_enc_list[i], sclr_list[i])
+		y_pred = predict(X, model_path + str(i) + '.pkl', xgb=False)
+		y = df_list[i][[sqft_var]].copy()
 		y[target_var] = y_pred
 		y = inverse_transform(y)
 		preds.append(y)
@@ -184,30 +195,37 @@ def pred_lgb(df,
 	return pred
 
 
-def pred_xgb(df,
+def pred_xgb(df, rare_enc_list, mean_enc_list, sclr_list, model_path,
+             output_path='predictions/pred.csv',
              sqft_var='square_feet',
-             target_var='meter_reading',
-             output_path='predictions/pred.csv'):
+             target_var='meter_reading'):
 
 	'''
 	Make predictions using XGBoost.
 
 	:param df: (Pandas dataframe) preprocessed data with listed variables
+	:param rare_enc_list: (List of Feature-engine categorical encoder objects)
+						  trained rare label categorical encoders
+	:param mean_enc_list: (List of Feature-engine categorical encoder objects)
+						  trained mean categorical encoders
+	:param sclr_list: (List of Scikit-learn preprocessing objects)
+					  trained standard scalers
+	:param model_path: (String) path to trained XGBoost model
+	:param output_path: (String) path to save predictions
 	:param sqft_var: (String) name of square footage variable
 	:param target_var: (String) name of target variable
-	:param output_path: (String) path to save predictions
 
 	:return: predictions in a dataframe (Kaggle submission format)
 	'''
 
 	df.reset_index(inplace=True)
-	dfs = split(df)
+	df_list = split(df)
 	preds = []
 
 	for i in range(4):
-		X = transform(dfs[i], rare_enc[i], mean_enc[i], scaler[i])
-		y_pred = predict(X, xgb[i])
-		y = dfs[i][[sqft_var]].copy()
+		X = transform(df_list[i], rare_enc_list[i], mean_enc_list[i], sclr_list[i])
+		y_pred = predict(X, model_path + str(i) + '.pkl')
+		y = df_list[i][[sqft_var]].copy()
 		y[target_var] = y_pred
 		y = inverse_transform(y)
 		preds.append(y)
