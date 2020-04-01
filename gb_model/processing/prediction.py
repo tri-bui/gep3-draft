@@ -7,15 +7,16 @@ import xgboost as xgb
 def split(df,
           meter_var='meter'):
 
-	'''
+	"""
 	Split data by meter type.
 
 	:param df: (Pandas dataframe) full data
 	:param meter_var: (string) name of meter type variable
 
 	:return: list of dataframes split by meter type
-	'''
+	"""
 
+	df = df.copy()
 	dfs = []
 	for m in range(4):
 		dfm = df[df[meter_var] == m].drop(meter_var, axis=1)
@@ -25,7 +26,7 @@ def split(df,
 
 def transform(df, rare_enc, mean_enc, scaler):
 
-	'''
+	"""
 	Transform data using rare label categorical encoding, mean
 	categorical encoding, and standard scaling. Features will be
 	selected on this resulting data.
@@ -39,8 +40,9 @@ def transform(df, rare_enc, mean_enc, scaler):
 				   fitted standard scaler
 
 	:return: transformed dataframe with selected features
-	'''
+	"""
 
+	df = df.copy()
 	transformed = rare_enc.transform(df)
 	transformed = mean_enc.transform(transformed)
 	transformed = scaler.transform(transformed)
@@ -50,7 +52,7 @@ def transform(df, rare_enc, mean_enc, scaler):
 
 def predict(df, model_path, use_xgb=True):
 
-	'''
+	"""
 	Make predictions using a trained model.
 
 	:param df: (Pandas dataframe) data with features matching
@@ -59,8 +61,9 @@ def predict(df, model_path, use_xgb=True):
 	:param use_xgb: (boolean) whether or not to predict using a XGBoost model
 
 	:return: non-negative predictions
-	'''
+	"""
 
+	df = df.copy()
 	if use_xgb:
 		df = xgb.DMatrix(df)
 
@@ -72,7 +75,7 @@ def predict(df, model_path, use_xgb=True):
 
 def inverse_transform(df, sqft_var='square_feet', target_var='meter_reading'):
 
-	'''
+	"""
 	Inverse transform predictions. The target variable in the training data
 	was standardized using the square_feet variable and then log-transformed.
 
@@ -81,8 +84,9 @@ def inverse_transform(df, sqft_var='square_feet', target_var='meter_reading'):
 	:param target_var: (String) name of target variable
 
 	:return: inverse-transformed dataframe
-	'''
+	"""
 
+	df = df.copy()
 	df[target_var] = np.expm1(df[target_var])
 	df[target_var] *= df[sqft_var] / df[sqft_var].mean()
 	return df
@@ -93,7 +97,7 @@ def convert_site0_units(df,
                         meter_var='meter',
                         target_var='meter_reading'):
 
-	'''
+	"""
 	Convert site 0 meter 0 readings from kWh back to kBTU and site 0 meter 1
 	readings from tons back to kBTU. Site 0 meter readings in the training data
 	were recorded in kBTU, but the model was trained on units kWh and tons for
@@ -105,8 +109,9 @@ def convert_site0_units(df,
 	:param target_var: (String) name of target variable
 
 	:return: dataframe with units in site 0 converted
-	'''
+	"""
 
+	df = df.copy()
 	df.loc[(df[site_var] == 0) & (df[meter_var] == 0), target_var] *= 3.4118
 	df.loc[(df[site_var] == 0) & (df[meter_var] == 1), target_var] *= 12
 	return df
@@ -117,7 +122,7 @@ def convert_site0_units(df,
 #                sqft_var='square_feet',
 #                target_var='meter_reading'):
 #
-# 	'''
+# 	"""
 # 	Make predictions using LightGBM or XGBoost.
 #
 # 	:param df: (Pandas dataframe) preprocessed data with listed variables
@@ -130,7 +135,7 @@ def convert_site0_units(df,
 # 	:param target_var: (String) name of target variable
 #
 # 	:return: predictions in a list
-# 	'''
+# 	"""
 #
 # 	df.reset_index(inplace=True)
 # 	df_list = split(df)

@@ -6,7 +6,7 @@ from sklearn.base import BaseEstimator, TransformerMixin
 
 class WeatherExtractor(BaseEstimator, TransformerMixin):
 
-	'''
+	"""
 	Feature extractor for weather-related variables. This is used to create a
 	new feature for relative humidity and to convert compass direction into
 	x- and y- components.
@@ -14,7 +14,7 @@ class WeatherExtractor(BaseEstimator, TransformerMixin):
 	:param dir_var: (string) name of direction variable
 	:param air_var: (string) name of air temperature variable
 	:param dew_var: (string) name of dew temperature variable
-	'''
+	"""
 
 	def __init__(self,
 	             dir_var='wind_direction',
@@ -47,13 +47,13 @@ class WeatherExtractor(BaseEstimator, TransformerMixin):
 
 class TimeExtractor(BaseEstimator, TransformerMixin):
 
-	'''
+	"""
 	Feature extractor for the datetime variable. This is used to extract
 	day of year, day of week, and hour of day components from timestamps as
 	well as a weekend boolean feature.
 
 	:param time_var: (string) name of datetime variable
-	'''
+	"""
 
 	def __init__(self,
 	             time_var='timestamp'):
@@ -73,14 +73,14 @@ class TimeExtractor(BaseEstimator, TransformerMixin):
 
 class HolidayExtractor(BaseEstimator, TransformerMixin):
 
-	'''
+	"""
 	Feature extractor for site-specific features. This is used to create
 	country string and holiday boolean features.
 
 	:param countries: (dictionary) mapping of site to country
 	:param site_var: (string) name of site variable
 	:param time_var: (string) name of datetime variable
-	'''
+	"""
 
 	def __init__(self, countries,
 	             site_var='site_id',
@@ -97,6 +97,7 @@ class HolidayExtractor(BaseEstimator, TransformerMixin):
 		return self
 
 	def transform(self, X):
+		X = X.copy()
 		X['country'] = X[self.site_var].map(self.countries)
 		US = X[X.country == 'US'].copy()
 		US['is_holiday'] = US[self.time_var].map(lambda d: int(d in self.USh))
@@ -112,11 +113,11 @@ class HolidayExtractor(BaseEstimator, TransformerMixin):
 
 class FeatSelector(BaseEstimator, TransformerMixin):
 
-	'''
+	"""
 	Feature selector.
 
 	:param feats: (list of strings) features
-	'''
+	"""
 
 	def __init__(self, feats):
 		self.feats = feats
@@ -125,4 +126,5 @@ class FeatSelector(BaseEstimator, TransformerMixin):
 		return self
 
 	def transform(self, X):
+		X = X.copy()
 		return X[self.feats].copy()

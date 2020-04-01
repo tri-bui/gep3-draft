@@ -2,15 +2,21 @@ import pathlib
 import gb_model
 
 # Directory paths
-ROOT_PATH = pathlib.Path(gb_model.__file__).resolve().parent
-DATA_PATH = ROOT_PATH / 'datasets'
-MODEL_PATH = ROOT_PATH / 'models'
+# ROOT_PATH = pathlib.Path(gb_model.__file__).resolve().parent
+# DATA_PATH = ROOT_PATH / 'datasets'
+# MODEL_PATH = ROOT_PATH / 'models'
+
+# Column list
+METER_COLS = ['building_id', 'meter', 'timestamp']
+WEATHER_COLS = ['site_id', 'timestamp', 'air_temperature', 'dew_temperature',
+                'sea_level_pressure', 'wind_speed', 'wind_direction']
+
 
 # Selected features
 FEATS = ['building_id', 'primary_use', 'square_feet', 'year_built', 'country',
          'dayofyear', 'hour', 'is_weekend', 'is_holiday',
          'rel_humidity', 'dew_temperature', 'sea_level_pressure',
-         'wind_speed', 'wind_direction_y']
+         'wind_speed', 'wind_direction_y', 'site_id', 'meter']
 
 # Site to country mapping
 COUNTRIES = {0: 'US', 1: 'UK', 2: 'US', 3: 'US',

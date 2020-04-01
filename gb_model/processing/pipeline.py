@@ -38,7 +38,7 @@ def pred_pipe(df, rare_path, mean_path, sclr_path, model_path,
                sqft_var='square_feet',
                target_var='meter_reading'):
 
-	'''
+	"""
 	Make predictions using LightGBM or XGBoost.
 
 	:param df: (Pandas dataframe) preprocessed data with listed variables
@@ -51,9 +51,13 @@ def pred_pipe(df, rare_path, mean_path, sclr_path, model_path,
 	:param target_var: (String) name of target variable
 
 	:return: predictions in a list
-	'''
+	"""
 
+	df = df.copy()
 	df.reset_index(inplace=True)
+	tmp = df[['index', 'site_id', 'meter']].copy()
+	df.drop(['index', 'site_id'], axis=1, inplace=True)
+
 	df_list = pn.split(df)
 	preds = []
 
@@ -70,7 +74,8 @@ def pred_pipe(df, rare_path, mean_path, sclr_path, model_path,
 		preds.append(y)
 
 	pred = pd.concat(preds).sort_index().reset_index()
-	pred = pd.merge(df[['index', 'site_id', 'meter']], pred, on='index', how='left')
+	pred = pd.merge(tmp, pred, on='index', how='left')
 	pred = pn.convert_site0_units(pred)
+	
 	pred = pred[target_var].tolist()
 	return pred

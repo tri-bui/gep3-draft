@@ -5,13 +5,13 @@ from sklearn.base import BaseEstimator, TransformerMixin
 
 class TimeConverter(BaseEstimator, TransformerMixin):
 
-	'''
+	"""
 	UTC-to-local timestamp converter.
 
 	:param timezones: (list of integers) timezone offsets
 	:param site_var: (string) name of site variable
 	:param time_var: (string) name of datetime variable
-	'''
+	"""
 
 	def __init__(self, timezones,
 	             site_var='site_id',
@@ -34,7 +34,7 @@ class TimeConverter(BaseEstimator, TransformerMixin):
 
 class TimeReindexer(BaseEstimator, TransformerMixin):
 
-	'''
+	"""
 	Site and datetime reindexer to include a timestamp for every hour within
 	the time interval at every site.
 
@@ -45,7 +45,7 @@ class TimeReindexer(BaseEstimator, TransformerMixin):
 					first timestamp in new index
 	:param t_end: (datetime string in the format 'YYYY-MM-DD hh:mm:ss')
 				  last timestamp in new index
-	'''
+	"""
 
 	def __init__(self,
 	             site_var='site_id',
@@ -82,13 +82,13 @@ class TimeReindexer(BaseEstimator, TransformerMixin):
 
 class MissingImputer(BaseEstimator, TransformerMixin):
 
-	'''
+	"""
 	Missing value imputer using cubic and linear interpolation.
 
 	:param cub_vars: (list of strings) variable names for cubic interpolation
 	:param lin_vars: (list of strings) variable names for linear interpolation
 	:param site_var: (string) name of site variable
-	'''
+	"""
 
 	def __init__(self, cub_vars, lin_vars,
 	             site_var='site_id'):
@@ -113,7 +113,7 @@ class MissingImputer(BaseEstimator, TransformerMixin):
 
 class DataCopier(BaseEstimator, TransformerMixin):
 
-	'''
+	"""
 	Data copier to a column from one site to another site. This is used to fill
 	missing data in sites with 100% missing values.
 
@@ -122,7 +122,7 @@ class DataCopier(BaseEstimator, TransformerMixin):
 	:param var_to_copy: (string) name of variable to copy
 	:param copy_from_site: (integer) site to copy data from
 	:param copy_to_site: (integer) site to copy data to
-	'''
+	"""
 
 	def __init__(self,
 	             site_var='site_id'):
@@ -155,7 +155,7 @@ class DataCopier(BaseEstimator, TransformerMixin):
 def merge_data(meter_df, weather_df, building_df,
                on_mb='building_id', on_mbw=['site_id', 'timestamp']):
 
-	'''
+	"""
 	Combine the meter, weather, and building data.
 
 	:param meter_df: (Pandas dataframe) meter data
@@ -167,8 +167,11 @@ def merge_data(meter_df, weather_df, building_df,
 				   resulting dataframe and weather_df on
 
 	:return: dataframe containing meter, weather, and building data
-	'''
+	"""
 
-	mb = pd.merge(meter_df, building_df, on=on_mb, how='left')
-	mbw = pd.merge(mb, weather_df, on=on_mbw, how='left')
+	meter = meter_df.copy()
+	weather = weather_df.copy()
+	building = building_df.copy()
+	mb = pd.merge(meter, building, on=on_mb, how='left')
+	mbw = pd.merge(mb, weather, on=on_mbw, how='left')
 	return mbw
